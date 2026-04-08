@@ -12,6 +12,7 @@
 #include "remote_folder_dialog.h"
 #include "transfer_dialog.h"
 #include "utils.h"
+#include <functional>
 
 RemoteWidget::RemoteWidget(IconCache *iconCache, const QString &remote,
                            const QString &remoteType, QWidget *parent)
@@ -21,6 +22,14 @@ RemoteWidget::RemoteWidget(IconCache *iconCache, const QString &remote,
 
   ui.frameTools->hide();
   ui.elidedMeasure->hide();
+
+  // Hide unwanted UI elements: upload, mount, dedupe, cleanup, Google
+  // Drive mode (Shared with me / Trash). Tools button retained but its
+  // menu only carries items we still support.
+  ui.buttonUpload->hide();
+  ui.buttonMount->hide();
+  ui.buttonDedupe->hide();
+  ui.cb_GoogleDriveMode->hide();
 
   bool isLocal = remoteType == "local";
   bool isGoogle = remoteType == "drive";
@@ -79,12 +88,11 @@ RemoteWidget::RemoteWidget(IconCache *iconCache, const QString &remote,
   ui.tree->setAlternatingRowColors(
       settings->value("Settings/rowColors", false).toBool());
 
-  ui.cb_GoogleDriveMode->setDisabled(!isGoogle);
-  // hide cb_GoogleDriveMode and Dedupe button for non Google remotes
-  if (!isGoogle) {
-    ui.cb_GoogleDriveMode->hide();
-    ui.buttonDedupe->hide();
-  }
+  // cb_GoogleDriveMode (Main / Shared with me / Trash) is hidden in this
+  // build; force the index to "Main" so all remote-mode helpers behave as
+  // if no special Google Drive mode is selected.
+  ui.cb_GoogleDriveMode->setCurrentIndex(0);
+  ui.cb_GoogleDriveMode->setDisabled(true);
 
   QString img_add = "";
 
@@ -320,15 +328,8 @@ RemoteWidget::RemoteWidget(IconCache *iconCache, const QString &remote,
   menuMode->addAction(ui.link);
   menuMode->addAction(ui.export_);
   menuMode->addAction(ui.actionCheck);
-
-  if (remoteType == "drive") {
-    menuMode->addAction(ui.actionDedupe);
-  }
-  //  if (remoteType == "drive" || remoteType == "b2" || remoteType =="mailru"
-  //  || remoteType =="mega" || remoteType =="pcloud" || remoteType =="yandex" )
-  //  {
-  menuMode->addAction(ui.cleanup);
-  //  }
+  // Dedupe and cleanup intentionally omitted from the Tools menu in this
+  // build.
   ui.buttonTools->setMenu(menuMode);
   ui.buttonTools->setPopupMode(QToolButton::InstantPopup);
 
@@ -1682,9 +1683,7 @@ RemoteWidget::RemoteWidget(IconCache *iconCache, const QString &remote,
                      menu.addAction(ui.move);
                      menu.addAction(ui.purge);
                      menu.addSeparator();
-                     menu.addAction(ui.actionNewMount);
                      menu.addAction(ui.stream);
-                     menu.addAction(ui.upload);
                      menu.addAction(ui.download);
                      menu.addSeparator();
                      menu.addAction(ui.getSize);
@@ -1692,9 +1691,6 @@ RemoteWidget::RemoteWidget(IconCache *iconCache, const QString &remote,
                      menu.addAction(ui.link);
                      menu.addAction(ui.export_);
                      menu.addAction(ui.actionCheck);
-                     if (remoteType == "drive") {
-                       menu.addAction(ui.actionDedupe);
-                     }
                      menu.exec(ui.tree->viewport()->mapToGlobal(pos));
                    });
 
@@ -1766,6 +1762,46 @@ RemoteWidget::RemoteWidget(IconCache *iconCache, const QString &remote,
 
     QTimer::singleShot(0, this, SLOT(switchRemoteType()));
   });
+
+  // Recursive search/filter for the file browser. Hides rows in the tree
+  // view based on a substring match (case-insensitive). A folder stays
+  // visible when its own name matches OR any of its already-loaded
+  // descendants matches; matching folders are auto-expanded so the hits
+  // are visible.
+  QObject::connect(ui.search, &QLineEdit::textChanged, this,
+                   [=](const QString &text) {
+                     QString needle = text.trimmed();
+
+                     std::function<bool(const QModelIndex &)> walk =
+                         [&](const QModelIndex &parent) -> bool {
+                       bool anyVisible = false;
+                       int rows = model->rowCount(parent);
+                       for (int i = 0; i < rows; ++i) {
+                         QModelIndex child = model->index(i, 0, parent);
+                         QString name =
+                             model->data(child, Qt::DisplayRole).toString();
+
+                         bool selfMatch =
+                             needle.isEmpty() ||
+                             name.contains(needle, Qt::CaseInsensitive);
+                         bool childMatch = walk(child);
+                         bool visible = selfMatch || childMatch;
+
+                         ui.tree->setRowHidden(i, parent, !visible);
+
+                         if (!needle.isEmpty() && childMatch &&
+                             model->isFolder(child)) {
+                           ui.tree->expand(child);
+                         }
+                         if (visible) {
+                           anyVisible = true;
+                         }
+                       }
+                       return anyVisible;
+                     };
+
+                     walk(QModelIndex());
+                   });
 }
 
 RemoteWidget::~RemoteWidget() {}

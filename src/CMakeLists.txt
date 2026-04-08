@@ -82,6 +82,7 @@ set(OTHER
   global.h
   qcronfield.h
   qcronnode.h
+  embedded_config.h
 )
 
 set(SOURCE

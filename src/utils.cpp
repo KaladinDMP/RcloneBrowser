@@ -1,8 +1,11 @@
 #include "utils.h"
+#include "embedded_config.h"
 
 static QString gRclone;
 static QString gRcloneConf;
 static QString gRclonePassword;
+static QString gEmbeddedConfigTempPath;
+static bool gEmbeddedConfigLoaded = false;
 
 // Software versions comparison
 // source: https://helloacm.com/how-to-compare-version-numbers-in-c/
@@ -269,6 +272,89 @@ void UseRclonePassword(QProcess *process) {
 
 void SetRclonePassword(const QString &rclonePassword) {
   gRclonePassword = rclonePassword;
+}
+
+namespace {
+
+// XOR-decode an obfuscated byte buffer in place into a fresh QByteArray.
+QByteArray xorDecode(const unsigned char *data, unsigned int size,
+                     const unsigned char *key, unsigned int keySize) {
+  QByteArray out;
+  out.resize(static_cast<int>(size));
+  for (unsigned int i = 0; i < size; ++i) {
+    out[static_cast<int>(i)] =
+        static_cast<char>(data[i] ^ key[i % keySize]);
+  }
+  return out;
+}
+
+} // namespace
+
+bool HasEmbeddedConfig() { return gEmbeddedConfigLoaded; }
+
+bool LoadEmbeddedConfig() {
+  using namespace embedded_config;
+
+  if (kEmbeddedConfigSize == 0) {
+    return false;
+  }
+
+  QByteArray plain = xorDecode(kEmbeddedConfig, kEmbeddedConfigSize,
+                               kEmbeddedConfigKey, kEmbeddedConfigKeySize);
+
+  // Write the decoded config to a unique temp file and lock it down so
+  // only the current user can read it.
+  QString tmplPath = QDir(QDir::tempPath()).filePath("rcb-XXXXXX.conf");
+  QTemporaryFile *tempFile = new QTemporaryFile(tmplPath);
+  tempFile->setAutoRemove(false);
+  if (!tempFile->open()) {
+    delete tempFile;
+    return false;
+  }
+  tempFile->write(plain);
+  tempFile->flush();
+  QString path = tempFile->fileName();
+  tempFile->close();
+  delete tempFile;
+
+  QFile::setPermissions(path,
+                        QFile::ReadOwner | QFile::WriteOwner);
+
+  gEmbeddedConfigTempPath = path;
+  gEmbeddedConfigLoaded = true;
+
+  // Override any user-set rclone.conf path so the rest of the app uses
+  // our embedded copy without having to know about it.
+  SetRcloneConf(path);
+
+  if (kEmbeddedConfigPasswordSize > 0) {
+    QByteArray pwd = xorDecode(kEmbeddedConfigPassword,
+                               kEmbeddedConfigPasswordSize,
+                               kEmbeddedConfigKey, kEmbeddedConfigKeySize);
+    SetRclonePassword(QString::fromUtf8(pwd));
+    // Best-effort wipe.
+    for (int i = 0; i < pwd.size(); ++i) {
+      pwd[i] = '\0';
+    }
+  }
+
+  // Best-effort wipe of the in-memory plaintext copy.
+  for (int i = 0; i < plain.size(); ++i) {
+    plain[i] = '\0';
+  }
+
+  return true;
+}
+
+void CleanupEmbeddedConfig() {
+  if (!gEmbeddedConfigLoaded) {
+    return;
+  }
+  if (!gEmbeddedConfigTempPath.isEmpty()) {
+    QFile::remove(gEmbeddedConfigTempPath);
+    gEmbeddedConfigTempPath.clear();
+  }
+  gEmbeddedConfigLoaded = false;
 }
 
 QStringList GetRemoteModeRcloneOptions() {

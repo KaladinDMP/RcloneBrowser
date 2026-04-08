@@ -135,7 +135,12 @@ MainWindow::MainWindow() {
     restoreGeometry(settings->value("MainWindow/geometry").toByteArray());
   }
   SetRclone(settings->value("Settings/rclone").toString());
-  SetRcloneConf(settings->value("Settings/rcloneConf").toString());
+  // When an embedded config has been loaded by main(), keep using it and
+  // ignore whatever path the user has set in preferences - we never want
+  // the plain config from disk to be touched.
+  if (!HasEmbeddedConfig()) {
+    SetRcloneConf(settings->value("Settings/rcloneConf").toString());
+  }
 
   mAlwaysShowInTray =
       settings->value("Settings/alwaysShowInTray", false).toBool();
@@ -630,7 +635,10 @@ MainWindow::MainWindow() {
                          dialog.getJobLastFinishedScriptRun());
 
       SetRclone(dialog.getRclone());
-      SetRcloneConf(dialog.getRcloneConf());
+      // Never let the preferences dialog override the embedded config.
+      if (!HasEmbeddedConfig()) {
+        SetRcloneConf(dialog.getRcloneConf());
+      }
       mFirstTime = true;
       rcloneGetVersion();
 
