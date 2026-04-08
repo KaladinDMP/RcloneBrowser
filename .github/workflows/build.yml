@@ -12,33 +12,27 @@ jobs:
   build_windows:
     name: Windows Build
     runs-on: windows-latest
-    
+
     steps:
-      - uses: actions/checkout@v3
-      - name: Install Development Tools
-        run: |
-          choco install visualstudio2019community visualstudio2019-workload-nativedesktop cmake qt5-default -y
-          curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-          refreshenv
-          python get-pip.py
-          refreshenv
-          pip install py7zr lxml requests semantic-version
-          Remove-Item -Recurse -Force C:\Qt
-          mkdir C:\Qt
-          pushd C:\Qt
-          git clone https://github.com/engnr/qt-downloader.git
-          mv qt-downloader/qt-downloader .\qtd
-          Remove-Item -Recurse -Force qt-downloader
-          python qtd windows desktop 5.15.2 win64_msvc2019_64
-          popd
-          
+      - uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '5.15.2'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_msvc2019_64'
+          cache: true
+
       - name: Build Rclone Browser
         run: |
           mkdir build
           cd build
-          cmake -G "Visual Studio 16 2019" -A x64 -DCMAKE_CONFIGURATION_TYPES="Release" -DCMAKE_PREFIX_PATH=C:\Qt\5.15.2\msvc2019_64 .. 
+          cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_CONFIGURATION_TYPES="Release" ..
           cmake --build . --config Release
-          C:\Qt\5.15.2\msvc2019_64\bin\windeployqt.exe --no-translations --no-angle --no-compiler-runtime --no-svg ".\build\Release\RcloneBrowser.exe"
+          windeployqt --no-translations --no-angle --no-compiler-runtime --no-svg ".\build\Release\RcloneBrowser.exe"
+
       - uses: actions/upload-artifact@v4
         with:
           name: windows
@@ -50,7 +44,7 @@ jobs:
     needs: [build_windows]
     
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Create artifact directory
         run: rm -rf /tmp/artifacts && mkdir /tmp/artifacts
       - uses: actions/download-artifact@v4
