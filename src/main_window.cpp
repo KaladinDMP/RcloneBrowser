@@ -2126,6 +2126,24 @@ MainWindow::MainWindow() {
     mSystemTray.show();
     QTimer::singleShot(0, this, SLOT(hide()));
   }
+
+  // ARMGDDN slim build: hide Tasks/Queue/Scheduler tabs from the
+  // main window and rename the Jobs tab to "Download". The underlying
+  // queue/scheduler/tasks widgets stay alive in memory (lots of code
+  // still references them) but are no longer reachable from the UI.
+  // Tabs must be removed in descending index order so earlier indices
+  // stay valid; the Remotes (0) and Jobs (1) tabs are kept.
+  for (int idx : {4, 3, 2}) {
+    if (idx < ui.tabs->count()) {
+      ui.tabs->removeTab(idx);
+    }
+  }
+  if (ui.tabs->count() > 1) {
+    ui.tabs->setTabText(1, "Download");
+  }
+  // Tabs are no longer closable in the slim build - the only tabs left
+  // are Remotes and Download, plus per-remote browser tabs which the
+  // user opens/closes via the Remotes list.
 }
 
 MainWindow::~MainWindow() {

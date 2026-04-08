@@ -796,6 +796,34 @@ TransferDialog::TransferDialog(bool isDownload, bool isDrop,
   }
 
   QTimer::singleShot(500, Qt::CoarseTimer, this, SLOT(showToolTip()));
+
+  // ARMGDDN slim build: this dialog becomes "pick the destination,
+  // press Run". Hide every tab except Settings, hide the
+  // Save-as-a-task group, hide the Dry run / Save task buttons, and
+  // disable everything in Settings other than the destination row so
+  // every download uses the defaults established by RestoreDefaults
+  // (which is already invoked above) plus whatever the user puts in
+  // To:.
+  for (int idx = ui.tabWidget->count() - 1; idx >= 1; --idx) {
+    ui.tabWidget->removeTab(idx);
+  }
+  ui.tabWidget->tabBar()->hide();
+
+  ui.groupBox_3->hide();
+
+  saveTask->hide();
+  dryRun->hide();
+  if (auto restore =
+          ui.buttonBox->button(QDialogButtonBox::RestoreDefaults)) {
+    restore->hide();
+  }
+
+  // Lock down every Settings widget that could change the defaults.
+  // Only the destination QLineEdit + folder picker remain interactive.
+  ui.modeGroup->setEnabled(false);
+  ui.skipFilesGroup->setEnabled(false);
+  ui.modeGroup_2->setEnabled(false);
+  ui.skipFilesGroup_2->setEnabled(false);
 }
 
 TransferDialog::~TransferDialog() {

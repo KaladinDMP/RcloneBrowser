@@ -23,11 +23,12 @@ RemoteWidget::RemoteWidget(IconCache *iconCache, const QString &remote,
   ui.frameTools->hide();
   ui.elidedMeasure->hide();
 
-  // Hide unwanted UI elements: upload, mount, dedupe, cleanup, Google
-  // Drive mode (Shared with me / Trash). Tools button retained but its
-  // menu only carries items we still support.
+  // Hide unwanted UI elements: upload, mount, stream, dedupe, cleanup,
+  // Google Drive mode (Shared with me / Trash). Tools button retained
+  // but its menu only carries items we still support.
   ui.buttonUpload->hide();
   ui.buttonMount->hide();
+  ui.buttonStream->hide();
   ui.buttonDedupe->hide();
   ui.cb_GoogleDriveMode->hide();
 
@@ -1683,7 +1684,6 @@ RemoteWidget::RemoteWidget(IconCache *iconCache, const QString &remote,
                      menu.addAction(ui.move);
                      menu.addAction(ui.purge);
                      menu.addSeparator();
-                     menu.addAction(ui.stream);
                      menu.addAction(ui.download);
                      menu.addSeparator();
                      menu.addAction(ui.getSize);
