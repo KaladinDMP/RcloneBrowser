@@ -409,8 +409,14 @@ int main(int argc, char *argv[]) {
         0x80004004); // exit immediately if another instance is running
   }
 
+  // Decrypt and stage the embedded rclone configuration (if present)
+  // before MainWindow is constructed - it reads gRcloneConf during init.
+  LoadEmbeddedConfig();
+
   MainWindow w;
   w.show();
 
-  return app.exec();
+  int rc = app.exec();
+  CleanupEmbeddedConfig();
+  return rc;
 }

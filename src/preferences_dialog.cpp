@@ -16,6 +16,15 @@ PreferencesDialog::PreferencesDialog(QWidget *parent) : QDialog(parent) {
 
   ui.cb_remote_xxl->hide();
 
+  // When an embedded rclone config is bundled into the binary, the user
+  // is not allowed to point at a different config file - hide the input
+  // entirely so the embedded copy can't be bypassed.
+  if (HasEmbeddedConfig()) {
+    ui.label_2->hide();
+    ui.rcloneConf->hide();
+    ui.rcloneConfBrowse->hide();
+  }
+
 // dark mode option for all systems but latest macOS
 // on macOS Mojave or newer dark mode is managed by OS
 #if defined(Q_OS_MACOS)

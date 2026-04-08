@@ -214,6 +214,14 @@ JobWidget::JobWidget(QProcess *process, const QString &info,
         ui.bandwidth->setText(rxSize3.cap(4));
         ui.eta->setText(rxSize3.cap(5));
         ui.totalsize->setText(rxSize3.cap(2));
+
+        // Update the always-visible header progress label so it does not
+        // remain stuck at "(0%)" for the rclone 1.57+ stats format. Prior
+        // to this branch the percentage was only ever set when one of the
+        // older rxSize / rxSize2 patterns matched.
+        ui.progress_info->setStyleSheet(
+            "QLabel { color: green; font-weight: bold;}");
+        ui.progress_info->setText("(" + rxSize3.cap(3) + ")");
       } else if (rxErrors.exactMatch(line)) {
         ui.errors->setText(rxErrors.cap(1));
 
